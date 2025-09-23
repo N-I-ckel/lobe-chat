@@ -1,0 +1,109 @@
+name: lobe-chat-database
+services:
+  postgresql:
+    image: pgvector/pgvector:pg17
+    container_name: lobe-postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - './data:/var/lib/postgresql/data'
+    environment:
+      - 'POSTGRES_DB=lobechat'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - lobe-network
+
+  # Casdoor認証サービス
+  casdoor:
+    image: casbin/casdoor:v2.13.0
+    container_name: lobe-casdoor
+    entrypoint: /bin/sh -c './server --createDatabase=true'
+    ports:
+      - '8000:8000'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      httpport: 8000
+      RUNNING_IN_DOCKER: 'true'
+      driverName: 'postgres'
+      dataSourceName: 'user=postgres password=${POSTGRES_PASSWORD} host=postgresql port=5432 sslmode=disable dbname=casdoor'
+      origin: 'https://auth.${DOMAIN}'
+      runmode: 'prod'
+    volumes:
+      - ./init_data.json:/init_data.json
+    networks:
+      - lobe-network
+
+  lobe:
+    image: lobehub/lobe-chat-database
+    container_name: lobe-chat
+    ports:
+      - '3210:3210'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      casdoor:
+        condition: service_started
+    environment:
+      # 基本設定
+      - 'APP_URL=https://chat.${DOMAIN}'
+      - 'NEXT_AUTH_SSO_PROVIDERS=casdoor'
+      - 'KEY_VAULTS_SECRET=${KEY_VAULTS_SECRET}'
+      - 'NEXT_AUTH_SECRET=${NEXT_AUTH_SECRET}'
+      - 'AUTH_URL=https://chat.${DOMAIN}/api/auth'
+      
+      # Casdoor認証設定
+      - 'AUTH_CASDOOR_ISSUER=https://auth.${DOMAIN}'
+      - 'AUTH_CASDOOR_ID=${AUTH_CASDOOR_ID}'
+      - 'AUTH_CASDOOR_SECRET=${AUTH_CASDOOR_SECRET}'
+      
+      # データベース設定
+      - 'DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/lobechat'
+      
+      # Backblaze B2設定
+      - 'S3_ENDPOINT=${S3_ENDPOINT}'
+      - 'S3_BUCKET=${S3_BUCKET}'
+      - 'S3_PUBLIC_DOMAIN=${S3_PUBLIC_DOMAIN}'
+      - 'S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}'
+      - 'S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}'
+      - 'S3_ENABLE_PATH_STYLE=0'
+      - 'S3_SET_ACL=0'
+      - 'LLM_VISION_IMAGE_USE_BASE64=1'
+      
+      # LLMプロバイダー設定
+      # OpenRouter
+      - 'OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}'
+      - 'OPENROUTER_MODEL_LIST=${OPENROUTER_MODEL_LIST:-}'
+      
+      # Runpod (OpenAI互換)
+      - 'OPENAI_API_KEY=${RUNPOD_API_KEY:-}'
+      - 'OPENAI_PROXY_URL=${RUNPOD_API_URL:-}'
+      - 'OPENAI_MODEL_LIST=${RUNPOD_MODEL_LIST:-}'
+      
+      # その他のLLMプロバイダー
+      - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'
+      - 'GOOGLE_API_KEY=${GOOGLE_API_KEY:-}'
+      
+      # プロキシ設定（必要に応じて）
+      - 'PROXY_URL=${PROXY_URL:-}'
+      
+    env_file:
+      - .env
+    restart: always
+    networks:
+      - lobe-network
+
+volumes:
+  data:
+    driver: local
+
+networks:
+  lobe-network:
+    driver: bridge
