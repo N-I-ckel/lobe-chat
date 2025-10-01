@@ -1,0 +1,534 @@
+---
+title: データベース版 LobeChat のデプロイに必要な環境変数
+description: >-
+  データベース版 LobeChat のデプロイに必要な環境変数の完全なリストと設定ガイド。
+tags:
+  - LobeChat
+  - 環境変数
+  - データベース
+  - デプロイメント
+  - サーバーサイド
+---
+
+# データベース版デプロイの環境変数
+
+このドキュメントでは、データベース版 LobeChat（サーバーサイドデータベース版）のデプロイに必要な環境変数とその他の設定可能な環境変数を列挙します。
+
+## 必須の環境変数
+
+データベース版 LobeChat をデプロイするには、以下の環境変数が必須です。
+
+### データベース設定
+
+#### `NEXT_PUBLIC_SERVICE_MODE`
+
+- タイプ：必須
+- 説明：LobeChat のサービスモードを指定します。サーバーサイドデータベースを使用する場合は `server` に設定します。
+- デフォルト値：`client`
+- 例：`server`
+
+<Callout type={'info'}>
+  公式の `lobe-chat-database` Docker イメージでは、この環境変数はデフォルトで `server` に設定されています。
+  Docker イメージを使用してデプロイする場合、この環境変数を再度設定する必要はありません。
+</Callout>
+
+<Callout type={'tip'}>
+  `NEXT_PUBLIC` で始まる環境変数はフロントエンドコードで有効になるため、コンテナランタイムインジェクションによる変更はできません。
+  Docker デプロイで `NEXT_PUBLIC` プレフィックスを持つ変数を変更する必要がある場合は、独自のイメージをビルドし、
+  ビルド時に独自の `NEXT_PUBLIC` プレフィックス付き環境変数を注入する必要があります。
+</Callout>
+
+#### `DATABASE_URL`
+
+- タイプ：必須
+- 説明：Postgres データベースの接続 URL。データベース接続 URL の標準的なフォーマットは `postgres://username:password@host:port/database` です。
+- デフォルト値：-
+- 例：`postgres://postgres:mysecretpassword@localhost:5432/lobechat`
+
+<Callout type={'info'}>
+  データベースに接続する際に SSL を有効にする場合は、[こちらのドキュメント](https://stackoverflow.com/questions/14021998/using-psql-to-connect-to-postgresql-in-ssl-mode)を参照してください。
+</Callout>
+
+#### `DATABASE_DRIVER`
+
+- タイプ：オプション（プラットフォームによって異なる）
+- 説明：Postgres データベースインスタンスのタイプを区別するために使用されます。値は `node` または `neon` です。
+- デフォルト値：Vercel プラットフォームでは `neon`、Docker イメージ `lobe-chat-database` では `node`
+- 例：`node` または `neon`
+
+以下の標準デプロイメント方法に従う場合、`DATABASE_DRIVER` 環境変数を手動で設定する必要はありません：
+
+- Vercel + Serverless Postgres
+- Docker イメージ + Node Postgres
+
+#### `KEY_VAULTS_SECRET`
+
+- タイプ：必須
+- 説明：ユーザーの API Key や baseURL などの機密情報を暗号化するためのキー。データベース侵害時の情報漏洩を防ぐために使用されます。
+- デフォルト値：-
+- 例：`jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk=`
+
+<Callout type={'info'}>
+  `openssl rand -base64 32` コマンドを使用して、ランダムな 32 文字の文字列を生成できます。
+</Callout>
+
+### 認証サービス設定
+
+サーバーサイドデータベースモードでは、異なるユーザーの ID を区別するために認証サービスが必要です。Clerk または NextAuth のいずれかを選択できます。
+
+#### Clerk を使用する場合
+
+##### `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+
+- タイプ：必須
+- 説明：Clerk アプリケーションの公開可能キー
+- デフォルト値：-
+- 例：`pk_test_Zmxvd4luZy1wdW1hLTIyLmNsXXJrTmFjY291bnRzLmRldiQ`（開発環境）/ `pk_live_Y2xlcdsubG9iZWh1Yi1cbmMuY24k`（本番環境）
+
+##### `CLERK_SECRET_KEY`
+
+- タイプ：必須
+- 説明：Clerk アプリケーションのシークレットキー
+- デフォルト値：-
+- 例：`sk_test_513Ma0P7IAWM1XMv4waxZjRYRajWTaCfJLjpEO3SD2`（開発環境）/ `sk_live_eMMlHjwJvZFUfczFljSKqZdwQtLvmczmsJSNmdrpeZ`（本番環境）
+
+##### `CLERK_WEBHOOK_SECRET`
+
+- タイプ：必須
+- 説明：Clerk の Webhook シークレットキー。データベースと共に Clerk を使用する場合に設定が必要です。
+- デフォルト値：-
+- 例：`whsec_xxxxxxxxxxxxxxxxxxxxxx`
+
+#### NextAuth を使用する場合
+
+##### `NEXT_PUBLIC_ENABLE_NEXT_AUTH`
+
+- タイプ：オプション（v1.52.0 以降変更あり）
+- 説明：NextAuth を有効にするかどうかを制御します
+- デフォルト値：-
+- 例：`1`（有効）/ `0`（無効）
+
+注意事項：
+- Vercel デプロイで Next Auth を使用するユーザーは、`NEXT_PUBLIC_ENABLE_NEXT_AUTH=1` 環境変数を追加する必要があります
+- Docker イメージで Clerk を使用するユーザーは、`NEXT_PUBLIC_ENABLE_NEXT_AUTH=0` 環境変数を設定する必要があります
+- その他の標準デプロイシナリオ（Vercel で Clerk、Docker で NextAuth）は影響を受けません
+
+##### `NEXT_AUTH_SECRET`
+
+- タイプ：必須
+- 説明：Auth.js セッショントークンを暗号化するためのキー
+- デフォルト値：-
+- 例：`Tfhi2t2pelSMEA8eaV61KaqPNEndFFdMIxDaJnS1CUI=`
+
+<Callout type={'info'}>
+  `openssl rand -base64 32` コマンドを使用してキーを生成できます。
+</Callout>
+
+##### `NEXT_AUTH_SSO_PROVIDERS`
+
+- タイプ：必須
+- 説明：LobeChat のシングルサインオンプロバイダーを指定します。複数のプロバイダーがある場合はカンマで区切ります。
+- デフォルト値：`auth0`
+- 例：`auth0`、`github`、`auth0,microsoft-entra-id,authentik`
+
+対応するプロバイダー：
+- `auth0` - Auth0
+- `microsoft-entra-id` - Microsoft Entra ID（旧 Azure AD）
+- `authentik` - Authentik
+- `authelia` - Authelia
+- `cloudflare-zero-trust` - Cloudflare Zero Trust
+- `logto` - Logto
+- `casdoor` - Casdoor
+- `zitadel` - Zitadel
+- `github` - GitHub
+- `generic-oidc` - Generic OIDC
+
+##### `NEXTAUTH_URL`
+
+- タイプ：オプション
+- 説明：Auth.js が OAuth 認証を実行する際のコールバックアドレス。Vercel でのデプロイ時は設定不要です。
+- デフォルト値：-
+- 例：`https://lobe.example.com/api/auth`
+
+##### 各プロバイダーの環境変数
+
+**Auth0**
+
+- `AUTH_AUTH0_ID`：Auth0 アプリケーションの Client ID（必須）
+- `AUTH_AUTH0_SECRET`：Auth0 アプリケーションの Client Secret（必須）
+- `AUTH_AUTH0_ISSUER`：Auth0 アプリケーションの Issuer / Domain（必須）
+
+**GitHub**
+
+- `AUTH_GITHUB_ID`：GitHub OAuth アプリケーションの Client ID（必須）
+- `AUTH_GITHUB_SECRET`：GitHub OAuth アプリケーションの Client Secret（必須）
+
+**Microsoft Entra ID（旧 Azure AD）**
+
+- `AUTH_AZURE_AD_ID`：Azure AD アプリケーションの Client ID（必須）
+- `AUTH_AZURE_AD_SECRET`：Azure AD アプリケーションの Client Secret（必須）
+- `AUTH_AZURE_AD_TENANT_ID`：Azure AD のテナント ID（必須）
+
+**Logto**
+
+- `AUTH_LOGTO_ID`：Logto アプリケーションの Client ID（必須）
+- `AUTH_LOGTO_SECRET`：Logto アプリケーションの Client Secret（必須）
+- `AUTH_LOGTO_ISSUER`：Logto プロバイダーの OpenID Connect Issuer（必須）
+- `LOGTO_WEBHOOK_SIGNING_KEY`：Logto Webhook リクエストを検証するための署名キー（オプション）
+
+その他のプロバイダー（Authentik、Authelia、Cloudflare Zero Trust、Zitadel、Casdoor、Generic OIDC）についても同様の環境変数が必要です。詳細は[認証サービスのドキュメント](/docs/self-hosting/environment-variables/auth)を参照してください。
+
+### S3 ストレージサービス設定
+
+マルチモーダル AI 会話や画像アップロード機能を使用するには、S3 互換のストレージサービスが必要です。
+
+#### `S3_ACCESS_KEY_ID`
+
+- タイプ：必須
+- 説明：S3 ストレージサービスのアクセスキー ID
+- デフォルト値：-
+- 例：`AKIAIOSFODNN7EXAMPLE`
+
+#### `S3_SECRET_ACCESS_KEY`
+
+- タイプ：必須
+- 説明：S3 ストレージサービスのシークレットアクセスキー
+- デフォルト値：-
+- 例：`wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY`
+
+#### `S3_ENDPOINT`
+
+- タイプ：必須
+- 説明：バケットのリクエストエンドポイント。`virtual-host` モードの場合、バケット名のプレフィックスを含めないでください。
+- デフォルト値：-
+- 例：`https://cos.ap-chengdu.myqcloud.com`
+
+#### `S3_BUCKET`
+
+- タイプ：必須
+- 説明：ストレージバケットの名前
+- デフォルト値：-
+- 例：`my-bucket`
+
+#### `S3_PUBLIC_DOMAIN`
+
+- タイプ：必須
+- 説明：バケットへの公開アクセスドメイン。バケット内のファイルへのアクセスに使用されます。
+- デフォルト値：-
+- 例：`https://files.example.com`
+
+#### `S3_REGION`
+
+- タイプ：オプション
+- 説明：ストレージバケットのリージョン
+- デフォルト値：-
+- 例：`ap-chengdu`、`us-west-1`
+
+#### `S3_ENABLE_PATH_STYLE`
+
+- タイプ：オプション
+- 説明：S3 の `path-style` アクセスモードを有効にするかどうか
+- デフォルト値：`0`
+- 例：`1`
+
+<Callout type={'info'}>
+  `path-style` と `virtual-host` は、S3 のバケットとオブジェクトへのアクセス方法の違いで、URL 構造とドメイン名解決が異なります。
+
+  S3 サービスプロバイダーのドメインが s3.example.net、バケットが mybucket、オブジェクトが config.env の場合：
+
+  - path-style：`s3.example.net/mybucket/config.env`
+  - virtual-host：`mybucket.s3.example.net/config.env`
+</Callout>
+
+#### `S3_SET_ACL`
+
+- タイプ：オプション
+- 説明：ファイルアップロード時に ACL を `public-read` に設定するかどうか
+- デフォルト値：`1`
+- 例：`0`
+
+## オプションの環境変数
+
+以下の環境変数はオプションですが、特定の機能を有効にしたりカスタマイズしたりするために使用できます。
+
+### 一般的な設定
+
+#### `ACCESS_CODE`
+
+- タイプ：オプション
+- 説明：LobeChat サービスへのアクセスパスワード。ブルートフォース攻撃を防ぐために長いパスワードを設定できます。
+- デフォルト値：-
+- 例：`awCTe)re_r74`
+
+#### `API_KEY_SELECT_MODE`
+
+- タイプ：オプション
+- 説明：複数の API キーがある場合のキー選択モード。現在 `random` と `turn` をサポートしています。
+- デフォルト値：`random`
+- 例：`random` または `turn`
+
+#### `NEXT_PUBLIC_BASE_PATH`
+
+- タイプ：オプション
+- 説明：LobeChat に `basePath` を追加します
+- デフォルト値：-
+- 例：`/test`
+
+#### `DEFAULT_AGENT_CONFIG`
+
+- タイプ：オプション
+- 説明：LobeChat のデフォルトアシスタントのデフォルト設定を構成します
+- デフォルト値：-
+- 例：`model=gpt-4-1106-preview;params.max_tokens=300;plugins=search-engine,lobe-image-designer`
+
+#### `SYSTEM_AGENT`
+
+- タイプ：オプション
+- 説明：LobeChat のシステムアシスタント（トピック生成、翻訳など）のモデルとプロバイダーを設定します
+- デフォルト値：-
+- 例：`default=ollama/deepseek-v3` または `topic=openai/gpt-4,translation=anthropic/claude-1`
+
+#### `ENABLE_AUTH_PROTECTION`
+
+- タイプ：オプション
+- 説明：ルート保護を有効にするかどうかを制御します。`1` に設定すると、パブリックルート以外のすべてのルートが認証を必要とします。
+- デフォルト値：`0`
+- 例：`1` または `0`
+
+### AI プロバイダーの環境変数
+
+データベース版でも、クライアント版と同様に各 AI プロバイダーの環境変数を設定できます。
+
+#### OpenAI
+
+- `ENABLED_OPENAI`：OpenAI を有効にするかどうか（デフォルト：`1`）
+- `OPENAI_API_KEY`：OpenAI API キー
+- `OPENAI_PROXY_URL`：OpenAI API のプロキシ URL
+- `OPENAI_MODEL_LIST`：利用可能なモデルのリスト
+
+#### Azure OpenAI
+
+- `AZURE_API_KEY`：Azure OpenAI の API キー
+- `AZURE_ENDPOINT`：Azure OpenAI のエンドポイント
+- `AZURE_API_VERSION`：Azure の API バージョン
+
+#### Anthropic
+
+- `ANTHROPIC_API_KEY`：Anthropic API キー
+- `ANTHROPIC_PROXY_URL`：Anthropic API のプロキシ URL
+
+#### Google AI
+
+- `GOOGLE_API_KEY`：Google AI API キー
+
+#### その他のプロバイダー
+
+LobeChat は 50 以上の AI プロバイダーをサポートしています：
+
+- Zhipu（`ZHIPU_API_KEY`）
+- Moonshot（`MOONSHOT_API_KEY`）
+- DeepSeek（`DEEPSEEK_API_KEY`）
+- Qwen（`QWEN_API_KEY`）
+- Mistral（`MISTRAL_API_KEY`）
+- Groq（`GROQ_API_KEY`）
+- Perplexity（`PERPLEXITY_API_KEY`）
+- Ollama（`OLLAMA_PROXY_URL`、`OLLAMA_MODEL_LIST`）
+
+その他多数...
+
+詳細なプロバイダーのリストと設定方法については、[モデルプロバイダーのドキュメント](/docs/self-hosting/environment-variables/model-provider)を参照してください。
+
+### ファイルとナレッジベース設定
+
+#### `CHUNKS_AUTO_EMBEDDING`
+
+- タイプ：オプション
+- 説明：チャンクの自動埋め込みを有効にするかどうか
+- デフォルト値：`1`（有効）
+- 例：`0`（無効）
+
+#### `CHUNKS_AUTO_GEN_METADATA`
+
+- タイプ：オプション
+- 説明：チャンクのメタデータの自動生成を有効にするかどうか
+- デフォルト値：`1`（有効）
+- 例：`0`（無効）
+
+#### `DEFAULT_FILES_CONFIG`
+
+- タイプ：オプション
+- 説明：埋め込みモデルとリランカーモデルを指定します
+- デフォルト値：-
+- 例：`embedding_model=openai/embedding-text-3-small,reranker_model=cohere/rerank-english-v3.0,query_mode=full_text`
+
+#### `LLM_VISION_IMAGE_USE_BASE64`
+
+- タイプ：オプション
+- 説明：画像アップロードに base64 エンコーディングを使用するかどうか
+- デフォルト値：未定義
+- 例：`1`
+
+### プラグインと市場
+
+#### `PLUGINS_INDEX_URL`
+
+- タイプ：オプション
+- 説明：LobeChat プラグインストアのインデックス URL
+- デフォルト値：`https://chat-plugins.lobehub.com`
+- 例：カスタム URL
+
+#### `PLUGIN_SETTINGS`
+
+- タイプ：オプション
+- 説明：プラグイン設定
+- デフォルト値：-
+- 例：`search-engine:SERPAPI_API_KEY=xxxxx`
+
+#### `AGENTS_INDEX_URL`
+
+- タイプ：オプション
+- 説明：LobeChat エージェント市場のインデックス URL
+- デフォルト値：`https://chat-agents.lobehub.com`
+- 例：カスタム URL
+
+### 分析サービス
+
+#### `ENABLE_VERCEL_ANALYTICS`
+
+- タイプ：オプション
+- 説明：Vercel Analytics を有効にするかどうか
+- デフォルト値：`0`
+- 例：`1`
+
+#### `PLAUSIBLE_DOMAIN`
+
+- タイプ：オプション
+- 説明：Plausible Analytics のドメイン
+- デフォルト値：-
+- 例：`yourdomain.com`
+
+#### `POSTHOG_KEY`
+
+- タイプ：オプション
+- 説明：PostHog のプロジェクトキー
+- デフォルト値：-
+- 例：`phc_xxxxxxxxxxxxxxxx`
+
+#### その他の分析サービス
+
+- Umami（`UMAMI_WEBSITE_ID`、`UMAMI_SCRIPT_URL`）
+- Google Analytics（`GOOGLE_ANALYTICS_MEASUREMENT_ID`）
+- Clarity（`CLARITY_PROJECT_ID`）
+
+### 機能フラグ
+
+#### `FEATURE_FLAGS`
+
+- タイプ：オプション
+- 説明：LobeChat の機能を制御します。`+` で機能を追加、`-` で機能を無効にします。
+- デフォルト値：`-`
+- 例：`"-welcome_suggest"`
+
+利用可能な機能フラグ：
+- `webrtc_sync`：WebRTC 同期機能
+- `language_model_settings`：言語モデル設定
+- `openai_api_key`：ユーザーによる OpenAI API Key のカスタマイズを許可
+- `openai_proxy_url`：ユーザーによる OpenAI プロキシ URL のカスタマイズを許可
+- `clerk_sign_up`：Clerk サインアップ機能
+
+詳細は[機能フラグのドキュメント](/docs/self-hosting/advanced/feature-flags)を参照してください。
+
+### その他の高度な設定
+
+#### `DATABASE_TEST_URL`
+
+- タイプ：オプション
+- 説明：テスト用のデータベース URL
+- デフォルト値：-
+- 例：`postgres://postgres:password@localhost:5432/lobechat_test`
+
+#### `DISABLE_REMOVE_GLOBAL_FILE`
+
+- タイプ：オプション
+- 説明：グローバルファイルの削除を無効にするかどうか
+- デフォルト値：`0`（削除有効）
+- 例：`1`（削除無効）
+
+## デプロイ例
+
+### Docker Compose での例
+
+```yaml
+services:
+  lobechat:
+    image: lobehub/lobe-chat-database:latest
+    environment:
+      # データベース設定
+      - DATABASE_URL=postgresql://postgres:password@postgresql:5432/lobechat
+      - KEY_VAULTS_SECRET=jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk=
+      - DATABASE_DRIVER=node
+      
+      # 認証設定（NextAuth + Auth0 の例）
+      - NEXT_PUBLIC_ENABLE_NEXT_AUTH=1
+      - NEXT_AUTH_SECRET=Tfhi2t2pelSMEA8eaV61KaqPNEndFFdMIxDaJnS1CUI=
+      - NEXT_AUTH_SSO_PROVIDERS=auth0
+      - AUTH_AUTH0_ID=your_auth0_client_id
+      - AUTH_AUTH0_SECRET=your_auth0_client_secret
+      - AUTH_AUTH0_ISSUER=https://your-domain.auth0.com
+      
+      # S3 設定
+      - S3_ACCESS_KEY_ID=your_access_key
+      - S3_SECRET_ACCESS_KEY=your_secret_key
+      - S3_ENDPOINT=https://your-s3-endpoint.com
+      - S3_BUCKET=lobechat
+      - S3_PUBLIC_DOMAIN=https://files.yourdomain.com
+      
+      # AI プロバイダー（オプション）
+      - OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+      
+    ports:
+      - "3210:3210"
+```
+
+### Vercel での例
+
+Vercel でデプロイする場合は、プロジェクト設定で以下の環境変数を設定してください：
+
+```bash
+# データベース設定
+DATABASE_URL=your_postgres_connection_url
+DATABASE_DRIVER=neon
+KEY_VAULTS_SECRET=your_32_character_secret
+
+# 認証設定（Clerk の例）
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxxxxxx
+CLERK_SECRET_KEY=sk_live_xxxxxxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxxxxxx
+
+# S3 設定
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+S3_ENDPOINT=https://your-s3-endpoint.com
+S3_BUCKET=lobechat
+S3_PUBLIC_DOMAIN=https://files.yourdomain.com
+
+# AI プロバイダー（オプション）
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+```
+
+## まとめ
+
+このドキュメントでは、データベース版 LobeChat のデプロイに必要なすべての環境変数を列挙しました。最小限のデプロイには以下が必要です：
+
+**必須項目：**
+1. データベース設定（`DATABASE_URL`、`KEY_VAULTS_SECRET`）
+2. 認証サービス設定（Clerk または NextAuth）
+3. S3 ストレージ設定（`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`、`S3_ENDPOINT`、`S3_BUCKET`、`S3_PUBLIC_DOMAIN`）
+
+**オプション項目：**
+- AI プロバイダーの API キー
+- 機能フラグ
+- 分析サービス
+- プラグインと市場の設定
+
+詳細な設定方法については、各カテゴリの専用ドキュメントを参照してください。

@@ -1,0 +1,214 @@
+---
+title: サーバーサイドデータベース版のデプロイ - 必須環境変数の概要
+description: >-
+  LobeChat データベース版のデプロイに必要な環境変数のクイックリファレンス。
+tags:
+  - LobeChat
+  - データベース
+  - デプロイメント
+  - 環境変数
+  - サーバーサイド
+---
+
+# サーバーサイドデータベース版のデプロイ
+
+LobeChat はデフォルトでクライアント側データベース（IndexedDB）を使用しますが、サーバー側データベースもサポートしています。LobeChat は、バックエンドストレージデータベースとして Postgres を使用します。
+
+このドキュメントでは、データベース版 LobeChat のデプロイに必要な環境変数の概要を説明します。
+
+## デプロイの必須条件
+
+データベース版 LobeChat の通常のデプロイプロセスには、3 つのモジュールの構成が含まれます：
+
+1. **データベース設定**
+2. **認証サービス設定**
+3. **S3 ストレージサービス設定**
+
+## 必須環境変数の一覧
+
+### 1. データベース設定
+
+| 環境変数 | タイプ | 説明 | 例 |
+|---------|------|------|-----|
+| `NEXT_PUBLIC_SERVICE_MODE` | 必須 | サービスモードを `server` に設定 | `server` |
+| `DATABASE_URL` | 必須 | Postgres データベース接続 URL | `postgres://user:pass@host:5432/db` |
+| `DATABASE_DRIVER` | 条件付き | データベースドライバー（`node` または `neon`） | `node` |
+| `KEY_VAULTS_SECRET` | 必須 | 機密情報暗号化キー（32 文字） | `openssl rand -base64 32` で生成 |
+
+<Callout type={'info'}>
+  - **Vercel** を使用する場合：`DATABASE_DRIVER=neon`（デフォルト）
+  - **Docker** を使用する場合：`DATABASE_DRIVER=node`（デフォルト）
+  - 公式 Docker イメージでは `NEXT_PUBLIC_SERVICE_MODE=server` が設定済み
+</Callout>
+
+### 2. 認証サービス設定
+
+データベース版では、以下のいずれかの認証サービスを選択する必要があります：
+
+#### オプション A: Clerk（推奨：Vercel デプロイ）
+
+| 環境変数 | タイプ | 説明 |
+|---------|------|------|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | 必須 | Clerk 公開鍵 |
+| `CLERK_SECRET_KEY` | 必須 | Clerk シークレットキー |
+| `CLERK_WEBHOOK_SECRET` | 必須 | Clerk Webhook シークレット |
+
+#### オプション B: NextAuth（推奨：Docker デプロイ）
+
+| 環境変数 | タイプ | 説明 |
+|---------|------|------|
+| `NEXT_PUBLIC_ENABLE_NEXT_AUTH` | 条件付き | NextAuth を有効化（`1` または `0`） |
+| `NEXT_AUTH_SECRET` | 必須 | セッション暗号化キー（32 文字） |
+| `NEXT_AUTH_SSO_PROVIDERS` | 必須 | SSO プロバイダー（例：`auth0`） |
+| `NEXTAUTH_URL` | オプション | コールバック URL |
+
+**NextAuth プロバイダー別の追加環境変数：**
+
+- **Auth0**: `AUTH_AUTH0_ID`, `AUTH_AUTH0_SECRET`, `AUTH_AUTH0_ISSUER`
+- **GitHub**: `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`
+- **Microsoft Entra ID**: `AUTH_AZURE_AD_ID`, `AUTH_AZURE_AD_SECRET`, `AUTH_AZURE_AD_TENANT_ID`
+- **Logto**: `AUTH_LOGTO_ID`, `AUTH_LOGTO_SECRET`, `AUTH_LOGTO_ISSUER`
+- その他（Authentik、Authelia、Cloudflare Zero Trust、Zitadel、Casdoor など）
+
+### 3. S3 ストレージサービス設定
+
+| 環境変数 | タイプ | 説明 | 例 |
+|---------|------|------|-----|
+| `S3_ACCESS_KEY_ID` | 必須 | S3 アクセスキー ID | `AKIAIOSFODNN7EXAMPLE` |
+| `S3_SECRET_ACCESS_KEY` | 必須 | S3 シークレットアクセスキー | `wJalrXUtnFEMI/...` |
+| `S3_ENDPOINT` | 必須 | S3 エンドポイント URL | `https://s3.example.com` |
+| `S3_BUCKET` | 必須 | バケット名 | `my-bucket` |
+| `S3_PUBLIC_DOMAIN` | 必須 | 公開アクセスドメイン | `https://files.example.com` |
+| `S3_REGION` | オプション | バケットリージョン | `us-west-1` |
+| `S3_ENABLE_PATH_STYLE` | オプション | path-style モード（`0` または `1`） | `0` |
+| `S3_SET_ACL` | オプション | ACL 設定（デフォルト：`1`） | `1` |
+
+## オプション環境変数
+
+以下は、追加機能やカスタマイズのための一般的なオプション環境変数です：
+
+### AI プロバイダー
+
+| 環境変数 | 説明 |
+|---------|------|
+| `OPENAI_API_KEY` | OpenAI API キー |
+| `ANTHROPIC_API_KEY` | Anthropic API キー |
+| `GOOGLE_API_KEY` | Google AI API キー |
+| `AZURE_API_KEY` | Azure OpenAI API キー |
+| その他 50+ プロバイダー | [詳細はこちら](/docs/self-hosting/environment-variables/model-provider) |
+
+### 一般的な設定
+
+| 環境変数 | 説明 | デフォルト |
+|---------|------|----------|
+| `ACCESS_CODE` | アクセスパスワード | - |
+| `API_KEY_SELECT_MODE` | API キー選択モード（`random` / `turn`） | `random` |
+| `DEFAULT_AGENT_CONFIG` | デフォルトアシスタント設定 | - |
+| `SYSTEM_AGENT` | システムアシスタント設定 | - |
+| `FEATURE_FLAGS` | 機能フラグ | - |
+
+### ファイルとナレッジベース
+
+| 環境変数 | 説明 | デフォルト |
+|---------|------|----------|
+| `CHUNKS_AUTO_EMBEDDING` | 自動埋め込み | `1` |
+| `CHUNKS_AUTO_GEN_METADATA` | 自動メタデータ生成 | `1` |
+| `DEFAULT_FILES_CONFIG` | 埋め込みモデル設定 | - |
+| `LLM_VISION_IMAGE_USE_BASE64` | Base64 画像エンコード | - |
+
+## クイックスタートテンプレート
+
+### 最小限の Docker Compose 構成
+
+```yaml
+version: '3.8'
+services:
+  lobechat:
+    image: lobehub/lobe-chat-database:latest
+    environment:
+      # === 必須: データベース ===
+      - DATABASE_URL=postgresql://postgres:password@postgresql:5432/lobechat
+      - KEY_VAULTS_SECRET=jgwsK28dspyVQoIf8/M3IIHl1h6LYYceSYNXeLpy6uk=
+      
+      # === 必須: 認証 (NextAuth + Auth0) ===
+      - NEXT_PUBLIC_ENABLE_NEXT_AUTH=1
+      - NEXT_AUTH_SECRET=Tfhi2t2pelSMEA8eaV61KaqPNEndFFdMIxDaJnS1CUI=
+      - NEXT_AUTH_SSO_PROVIDERS=auth0
+      - AUTH_AUTH0_ID=your_client_id
+      - AUTH_AUTH0_SECRET=your_client_secret
+      - AUTH_AUTH0_ISSUER=https://your-domain.auth0.com
+      
+      # === 必須: S3 ストレージ ===
+      - S3_ACCESS_KEY_ID=your_access_key
+      - S3_SECRET_ACCESS_KEY=your_secret_key
+      - S3_ENDPOINT=https://your-endpoint.com
+      - S3_BUCKET=lobechat
+      - S3_PUBLIC_DOMAIN=https://files.yourdomain.com
+      
+      # === オプション: AI プロバイダー ===
+      - OPENAI_API_KEY=sk-xxxxxxxx
+    ports:
+      - "3210:3210"
+    depends_on:
+      - postgresql
+
+  postgresql:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_DB=lobechat
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+```
+
+### Vercel デプロイの環境変数
+
+```bash
+# データベース
+DATABASE_URL=your_neon_or_vercel_postgres_url
+DATABASE_DRIVER=neon
+KEY_VAULTS_SECRET=your_32_char_secret
+
+# 認証（Clerk）
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxx
+CLERK_SECRET_KEY=sk_live_xxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxx
+
+# S3
+S3_ACCESS_KEY_ID=xxxxx
+S3_SECRET_ACCESS_KEY=xxxxx
+S3_ENDPOINT=https://xxxxx
+S3_BUCKET=lobechat
+S3_PUBLIC_DOMAIN=https://files.yourdomain.com
+
+# オプション: AI プロバイダー
+OPENAI_API_KEY=sk-xxxxx
+```
+
+## デプロイ前のチェックリスト
+
+- [ ] Postgres データベースの準備（pgvector プラグイン付き）
+- [ ] `KEY_VAULTS_SECRET` の生成（`openssl rand -base64 32`）
+- [ ] 認証サービスの選択と設定（Clerk または NextAuth）
+- [ ] S3 互換ストレージの準備
+- [ ] 必要に応じて AI プロバイダーの API キーを取得
+
+## 詳細情報
+
+より詳細な環境変数の説明とオプションについては、以下のドキュメントを参照してください：
+
+- [データベース環境変数の完全なリスト](/docs/self-hosting/environment-variables/database.ja-JP)
+- [認証サービス設定](/docs/self-hosting/environment-variables/auth)
+- [S3 ストレージ設定](/docs/self-hosting/environment-variables/s3)
+- [モデルプロバイダー設定](/docs/self-hosting/environment-variables/model-provider)
+- [基本的な環境変数](/docs/self-hosting/environment-variables/basic)
+
+## プラットフォーム別デプロイガイド
+
+- [Docker でのデプロイ](/docs/self-hosting/server-database/docker)
+- [Docker Compose でのデプロイ](/docs/self-hosting/server-database/docker-compose)
+- [Vercel でのデプロイ](/docs/self-hosting/server-database/vercel)
+- [Zeabur でのデプロイ](/docs/self-hosting/server-database/zeabur)
+- [その他のプラットフォーム](/docs/self-hosting/server-database)
